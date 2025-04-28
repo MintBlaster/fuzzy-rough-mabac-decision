@@ -109,7 +109,7 @@ def aggregate_terms(data, weights=None, t=8):
 
     return result_dict
 
-def get_expert_aggregation(expert_matrix, linguistic_df, expert_weights=None):
+def get_expert_aggregation(expert_matrix, linguistic_df):
     """
     Process a matrix of expert evaluations and compute aggregated results for each expert.
 
@@ -117,7 +117,6 @@ def get_expert_aggregation(expert_matrix, linguistic_df, expert_weights=None):
         expert_matrix (DataFrame or array-like): Matrix where each row corresponds to one expert
                                                 and each column contains linguistic terms
         linguistic_df (DataFrame): DataFrame mapping linguistic terms to their values
-        expert_weights (list, optional): Not used anymore here, aggregation is per expert individually.
 
     Returns:
         pandas.DataFrame: Aggregated values for each expert (row per expert)
@@ -145,7 +144,6 @@ def get_expert_aggregation(expert_matrix, linguistic_df, expert_weights=None):
     # Convert list of dicts to DataFrame
     final_df = pd.DataFrame(expert_aggregations)
 
-    # Add Expert IDs if you want
     final_df.index = [f"Expert_{i+1}" for i in range(n_experts)]
 
     return final_df
@@ -268,3 +266,75 @@ def get_criterion_aggregation(matrix, t_value=8, zeta_value=2, lower_scale=0.7, 
         results_df.index = matrix.index
 
     return results_df
+
+
+def aggregate_expert_matrices(expert_matrices, weights_file="../results/expert_aggregation.csv", t_value=8):
+
+    expert_weights_df = pd.read_csv(weights_file)
+    weights = expert_weights_df['normalized'].values
+
+    if len(weights) != len(expert_matrices):
+        raise ValueError(
+            f"Number of weights ({len(weights)}) doesn't match number of matrices ({len(expert_matrices)})")
+
+    # Initialize empty aggregated matrix
+    aggregated_matrix = pd.DataFrame(
+        index=expert_matrices[0].index,
+        columns=expert_matrices[0].columns
+    )
+
+    # Set the "Alternative" column properly
+    if 'Alternative' in expert_matrices[0].columns:
+        aggregated_matrix['Alternative'] = expert_matrices[0]['Alternative']
+
+    for row_idx in aggregated_matrix.index:
+        for col in aggregated_matrix.columns:
+            if col == 'Alternative':
+                continue
+
+            valid_expert_indices = []
+            valid_theta_lower = []
+            valid_mu_lower = []
+            valid_nu_lower = []
+            valid_theta_upper = []
+            valid_mu_upper = []
+            valid_nu_upper = []
+
+            for i, matrix in enumerate(expert_matrices):
+                cell_value = matrix.at[row_idx, col]
+                if isinstance(cell_value, tuple) and len(cell_value) == 6:
+                    valid_expert_indices.append(i)
+                    valid_theta_lower.append(cell_value[0])
+                    valid_mu_lower.append(cell_value[1])
+                    valid_nu_lower.append(cell_value[2])
+                    valid_theta_upper.append(cell_value[3])
+                    valid_mu_upper.append(cell_value[4])
+                    valid_nu_upper.append(cell_value[5])
+
+            if len(valid_expert_indices) == 0:
+                continue
+
+            valid_weights = weights[valid_expert_indices]
+            valid_weights = valid_weights / np.sum(valid_weights)
+
+            position_data = pd.DataFrame({
+                'theta_lower': valid_theta_lower,
+                'mu_lower': valid_mu_lower,
+                'nu_lower': valid_nu_lower,
+                'theta_upper': valid_theta_upper,
+                'mu_upper': valid_mu_upper,
+                'nu_upper': valid_nu_upper
+            })
+
+            aggregated_values = aggregate_terms(position_data, weights=valid_weights, t=t_value)
+
+            aggregated_matrix.at[row_idx, col] = (
+                aggregated_values['theta_lower'],
+                aggregated_values['mu_lower'],
+                aggregated_values['nu_lower'],
+                aggregated_values['theta_upper'],
+                aggregated_values['mu_upper'],
+                aggregated_values['nu_upper']
+            )
+
+    return aggregated_matrix
