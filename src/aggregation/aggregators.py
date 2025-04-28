@@ -3,83 +3,148 @@ import numpy as np
 import pandas as pd
 
 
-def aggregate_linguistic(theta_values, t_value=8, zeta_value=2, weights=None):
+def aggregate_linguistic(linguistic_inputs, max_linguistic_term=8, zeta=2, weights=None):
     """
-    Aggregates linguistic values
+    Aggregates linguistic values using a weighted power mean approach.
+
+    Formula:
+    L = t * (1 - (1/ζ) * ((1+ζ)/∏(i=1 to n)((1+ζ)/(1+ζ*(1-θᵢ/t)))^ωᵢ - 1))
 
     Args:
-        theta_values: Array of linguistic values to aggregate
-        t_value: Maximum linguistic term value (default=8)
-        zeta_value: Operational parameter affecting aggregation behavior (default=2)
+        linguistic_inputs: Array of linguistic values to aggregate
+        max_linguistic_term: Maximum linguistic term value (default=8)
+        zeta: Operational parameter affecting aggregation behavior (default=2)
         weights: Optional weights for each value (default=equal weights)
 
     Returns:
         Aggregated linguistic value
     """
-
-    theta_values = np.asarray(theta_values)
+    linguistic_inputs = np.asarray(linguistic_inputs)
 
     # Use equal weights if none provided
     if weights is None:
-        weights = np.ones(len(theta_values)) / len(theta_values)
+        weights = np.ones(len(linguistic_inputs)) / len(linguistic_inputs)
     else:
         weights = np.asarray(weights)
 
-    theta_ratio = theta_values / t_value
+    # Calculate ratio of each input to maximum term
+    normalized_inputs = linguistic_inputs / max_linguistic_term
 
-    complement_ratio = 1 - theta_ratio
+    # Calculate complement of normalized inputs (1 - θᵢ/t)
+    input_complements = 1 - normalized_inputs
 
-    denominator = 1 + zeta_value * complement_ratio
+    # Calculate denominator term (1 + ζ*(1-θᵢ/t))
+    modified_denominators = 1 + zeta * input_complements
 
-    fraction = (1 + zeta_value) / denominator
+    # Calculate base expressions for product ((1+ζ)/(1+ζ*(1-θᵢ/t)))
+    base_expressions = (1 + zeta) / modified_denominators
 
-    weighted_product = np.prod(fraction ** weights)
+    # Calculate weighted product ∏(i=1 to n)((1+ζ)/(1+ζ*(1-θᵢ/t)))^ωᵢ
+    weighted_product = np.prod(base_expressions ** weights)
 
-    middle_term = ((1 + zeta_value) / weighted_product) - 1
+    # Calculate middle term ((1+ζ)/weighted_product - 1)
+    compensation_factor = ((1 + zeta) / weighted_product) - 1
 
-    aggregated_linguistic = t_value * (1 - (1 / zeta_value) * middle_term)
+    # Calculate final result: t * (1 - (1/ζ) * compensation_factor)
+    aggregated_result = max_linguistic_term * (1 - (1 / zeta) * compensation_factor)
 
-    return aggregated_linguistic
+    return aggregated_result
 
 
-def aggregate_membership(mu_values, zeta_value=2, weights=None):
-    """Aggregates membership values."""
-    mu_values = np.asarray(mu_values)
+def aggregate_membership(membership_degrees, zeta=2, weights=None):
+    """
+    Aggregates membership values using a weighted power mean approach.
+
+    Formula:
+    μ = √(1 - (1/ζ) * ((1+ζ)/∏(i=1 to n)((1+ζ)/(1+ζ*(1-μᵢ²)))^ωᵢ - 1))
+
+    Args:
+        membership_degrees: Array of membership values to aggregate
+        zeta: Operational parameter affecting aggregation behavior (default=2)
+        weights: Optional weights for each value (default=equal weights)
+
+    Returns:
+        Aggregated membership value
+    """
+    membership_degrees = np.asarray(membership_degrees)
 
     if weights is None:
-        weights = np.ones(len(mu_values)) / len(mu_values)
+        weights = np.ones(len(membership_degrees)) / len(membership_degrees)
     else:
         weights = np.asarray(weights)
 
-    mu_squared = mu_values ** 2
-    inner_bracket = 1 - mu_squared
-    denominator = 1 + zeta_value * inner_bracket
-    fraction = (1 + zeta_value) / denominator
-    inner_loop_product = np.prod(fraction ** weights)
+    # Calculate squared membership values (μᵢ²)
+    squared_memberships = membership_degrees ** 2
 
-    middle_part = ((1 + zeta_value) / inner_loop_product) - 1
-    aggregated_membership = 1 - (1 / zeta_value) * middle_part
-    aggregated_membership = math.sqrt(aggregated_membership)
+    # Calculate complement term (1 - μᵢ²)
+    membership_complements = 1 - squared_memberships
+
+    # Calculate denominator term (1 + ζ*(1-μᵢ²))
+    modified_denominators = 1 + zeta * membership_complements
+
+    # Calculate base expressions for product ((1+ζ)/(1+ζ*(1-μᵢ²)))
+    base_expressions = (1 + zeta) / modified_denominators
+
+    # Calculate weighted product ∏(i=1 to n)((1+ζ)/(1+ζ*(1-μᵢ²)))^ωᵢ
+    weighted_product = np.prod(base_expressions ** weights)
+
+    # Calculate compensation factor ((1+ζ)/weighted_product - 1)
+    compensation_factor = ((1 + zeta) / weighted_product) - 1
+
+    # Calculate final result without square root: 1 - (1/ζ) * compensation_factor
+    inner_result = 1 - (1 / zeta) * compensation_factor
+
+    # Apply square root to get final membership value
+    aggregated_membership = math.sqrt(inner_result)
 
     return aggregated_membership
 
 
-def aggregate_non_membership(nu_values, zeta_value=2, weights=None):
-    """Aggregates non-membership values."""
-    nu_values = np.asarray(nu_values)
+def aggregate_non_membership(non_membership_degrees, zeta=2, weights=None):
+    """
+    Aggregates non-membership values using a weighted power mean approach.
+
+    Formula:
+    ν = √((1+ζ)*∏(i=1 to n)((1+ζ*νᵢ²)/(1+ζ))^ωᵢ - 1)/ζ)
+
+    Args:
+        non_membership_degrees: Array of non-membership values to aggregate
+        zeta: Operational parameter affecting aggregation behavior (default=2)
+        weights: Optional weights for each value (default=equal weights)
+
+    Returns:
+        Aggregated non-membership value
+    """
+    non_membership_degrees = np.asarray(non_membership_degrees)
 
     if weights is None:
-        weights = np.ones(len(nu_values)) / len(nu_values)
+        weights = np.ones(len(non_membership_degrees)) / len(non_membership_degrees)
     else:
         weights = np.asarray(weights)
 
-    numerator = 1 + zeta_value * nu_values ** 2
-    denominator = 1 + zeta_value
-    fraction = numerator / denominator
-    inner_loop_product = np.prod(fraction ** weights)
+    # Calculate squared non-membership values (νᵢ²)
+    squared_non_memberships = non_membership_degrees ** 2
 
-    outer_numerator = (1 + zeta_value) * inner_loop_product - 1
-    aggregated_non_membership = math.sqrt(outer_numerator / zeta_value)
+    # Calculate numerator for each term (1 + ζ*νᵢ²)
+    weighted_numerators = 1 + zeta * squared_non_memberships
+
+    # Calculate denominator constant (1 + ζ)
+    common_denominator = 1 + zeta
+
+    # Calculate base expression for product ((1+ζ*νᵢ²)/(1+ζ))
+    base_expressions = weighted_numerators / common_denominator
+
+    # Calculate weighted product ∏(i=1 to n)((1+ζ*νᵢ²)/(1+ζ))^ωᵢ
+    weighted_product = np.prod(base_expressions ** weights)
+
+    # Calculate numerator for final expression ((1+ζ)*weighted_product - 1)
+    final_numerator = (1 + zeta) * weighted_product - 1
+
+    # Calculate final result without square root: final_numerator / ζ
+    inner_result = final_numerator / zeta
+
+    # Apply square root to get final non-membership value
+    aggregated_non_membership = math.sqrt(inner_result)
 
     return aggregated_non_membership
 
