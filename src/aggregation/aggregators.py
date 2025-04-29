@@ -1,180 +1,9 @@
-﻿import math
-import numpy as np
+﻿import numpy as np
 import pandas as pd
+from .core import aggregate_terms
 
 
-def aggregate_linguistic(linguistic_inputs, max_linguistic_term=8, zeta=2, weights=None):
-    """
-    Aggregates linguistic values using a weighted power mean approach.
-
-    Formula:
-    L = t * (1 - (1/ζ) * ((1+ζ)/∏(i=1 to n)((1+ζ)/(1+ζ*(1-θᵢ/t)))^ωᵢ - 1))
-
-    Args:
-        linguistic_inputs: Array of linguistic values to aggregate
-        max_linguistic_term: Maximum linguistic term value (default=8)
-        zeta: Operational parameter affecting aggregation behavior (default=2)
-        weights: Optional weights for each value (default=equal weights)
-
-    Returns:
-        Aggregated linguistic value
-    """
-    linguistic_inputs = np.asarray(linguistic_inputs)
-
-    # Use equal weights if none provided
-    if weights is None:
-        weights = np.ones(len(linguistic_inputs)) / len(linguistic_inputs)
-    else:
-        weights = np.asarray(weights)
-
-    # Calculate ratio of each input to maximum term
-    normalized_inputs = linguistic_inputs / max_linguistic_term
-
-    # Calculate complement of normalized inputs (1 - θᵢ/t)
-    input_complements = 1 - normalized_inputs
-
-    # Calculate denominator term (1 + ζ*(1-θᵢ/t))
-    modified_denominators = 1 + zeta * input_complements
-
-    # Calculate base expressions for product ((1+ζ)/(1+ζ*(1-θᵢ/t)))
-    base_expressions = (1 + zeta) / modified_denominators
-
-    # Calculate weighted product ∏(i=1 to n)((1+ζ)/(1+ζ*(1-θᵢ/t)))^ωᵢ
-    weighted_product = np.prod(base_expressions ** weights)
-
-    # Calculate middle term ((1+ζ)/weighted_product - 1)
-    compensation_factor = ((1 + zeta) / weighted_product) - 1
-
-    # Calculate final result: t * (1 - (1/ζ) * compensation_factor)
-    aggregated_result = max_linguistic_term * (1 - (1 / zeta) * compensation_factor)
-
-    return aggregated_result
-
-
-def aggregate_membership(membership_degrees, zeta=2, weights=None):
-    """
-    Aggregates membership values using a weighted power mean approach.
-
-    Formula:
-    μ = √(1 - (1/ζ) * ((1+ζ)/∏(i=1 to n)((1+ζ)/(1+ζ*(1-μᵢ²)))^ωᵢ - 1))
-
-    Args:
-        membership_degrees: Array of membership values to aggregate
-        zeta: Operational parameter affecting aggregation behavior (default=2)
-        weights: Optional weights for each value (default=equal weights)
-
-    Returns:
-        Aggregated membership value
-    """
-    membership_degrees = np.asarray(membership_degrees)
-
-    if weights is None:
-        weights = np.ones(len(membership_degrees)) / len(membership_degrees)
-    else:
-        weights = np.asarray(weights)
-
-    # Calculate squared membership values (μᵢ²)
-    squared_memberships = membership_degrees ** 2
-
-    # Calculate complement term (1 - μᵢ²)
-    membership_complements = 1 - squared_memberships
-
-    # Calculate denominator term (1 + ζ*(1-μᵢ²))
-    modified_denominators = 1 + zeta * membership_complements
-
-    # Calculate base expressions for product ((1+ζ)/(1+ζ*(1-μᵢ²)))
-    base_expressions = (1 + zeta) / modified_denominators
-
-    # Calculate weighted product ∏(i=1 to n)((1+ζ)/(1+ζ*(1-μᵢ²)))^ωᵢ
-    weighted_product = np.prod(base_expressions ** weights)
-
-    # Calculate compensation factor ((1+ζ)/weighted_product - 1)
-    compensation_factor = ((1 + zeta) / weighted_product) - 1
-
-    # Calculate final result without square root: 1 - (1/ζ) * compensation_factor
-    inner_result = 1 - (1 / zeta) * compensation_factor
-
-    # Apply square root to get final membership value
-    aggregated_membership = math.sqrt(inner_result)
-
-    return aggregated_membership
-
-
-def aggregate_non_membership(non_membership_degrees, zeta=2, weights=None):
-    """
-    Aggregates non-membership values using a weighted power mean approach.
-
-    Formula:
-    ν = √((1+ζ)*∏(i=1 to n)((1+ζ*νᵢ²)/(1+ζ))^ωᵢ - 1)/ζ)
-
-    Args:
-        non_membership_degrees: Array of non-membership values to aggregate
-        zeta: Operational parameter affecting aggregation behavior (default=2)
-        weights: Optional weights for each value (default=equal weights)
-
-    Returns:
-        Aggregated non-membership value
-    """
-    non_membership_degrees = np.asarray(non_membership_degrees)
-
-    if weights is None:
-        weights = np.ones(len(non_membership_degrees)) / len(non_membership_degrees)
-    else:
-        weights = np.asarray(weights)
-
-    # Calculate squared non-membership values (νᵢ²)
-    squared_non_memberships = non_membership_degrees ** 2
-
-    # Calculate numerator for each term (1 + ζ*νᵢ²)
-    weighted_numerators = 1 + zeta * squared_non_memberships
-
-    # Calculate denominator constant (1 + ζ)
-    common_denominator = 1 + zeta
-
-    # Calculate base expression for product ((1+ζ*νᵢ²)/(1+ζ))
-    base_expressions = weighted_numerators / common_denominator
-
-    # Calculate weighted product ∏(i=1 to n)((1+ζ*νᵢ²)/(1+ζ))^ωᵢ
-    weighted_product = np.prod(base_expressions ** weights)
-
-    # Calculate numerator for final expression ((1+ζ)*weighted_product - 1)
-    final_numerator = (1 + zeta) * weighted_product - 1
-
-    # Calculate final result without square root: final_numerator / ζ
-    inner_result = final_numerator / zeta
-
-    # Apply square root to get final non-membership value
-    aggregated_non_membership = math.sqrt(inner_result)
-
-    return aggregated_non_membership
-
-
-def aggregate_terms(data, weights=None, t=8):
-    """Aggregates terms for both lower and upper approximations."""
-    if weights is None:
-        weights = np.ones(len(data)) / len(data)
-    else:
-        weights = np.asarray(weights)
-
-    theta_lower = data['theta_lower'].values
-    mu_lower = data['mu_lower'].values
-    nu_lower = data['nu_lower'].values
-    theta_upper = data['theta_upper'].values
-    mu_upper = data['mu_upper'].values
-    nu_upper = data['nu_upper'].values
-
-    result_dict = {
-        'theta_lower': aggregate_linguistic(theta_lower, t_value=t, weights=weights),
-        'mu_lower': aggregate_membership(mu_lower, weights=weights),
-        'nu_lower': aggregate_non_membership(nu_lower, weights=weights),
-        'theta_upper': aggregate_linguistic(theta_upper, t_value=t, weights=weights),
-        'mu_upper': aggregate_membership(mu_upper, weights=weights),
-        'nu_upper': aggregate_non_membership(nu_upper, weights=weights)
-    }
-
-    return result_dict
-
-def get_expert_aggregation(expert_matrix, linguistic_df):
+def get_expert_aggregation(expert_matrix, linguistic_df, zeta=2):
     """
     Process a matrix of expert evaluations and compute aggregated results for each expert.
 
@@ -182,6 +11,7 @@ def get_expert_aggregation(expert_matrix, linguistic_df):
         expert_matrix (DataFrame or array-like): Matrix where each row corresponds to one expert
                                                 and each column contains linguistic terms
         linguistic_df (DataFrame): DataFrame mapping linguistic terms to their values
+        zeta (float): Operational parameter for aggregation, default 2
 
     Returns:
         pandas.DataFrame: Aggregated values for each expert (row per expert)
@@ -202,26 +32,26 @@ def get_expert_aggregation(expert_matrix, linguistic_df):
         filtered_df = linguistic_df[linguistic_df["name"].isin(expert_terms)]
 
         # Aggregate terms for this expert (equal weights inside expert)
-        result = aggregate_terms(filtered_df)
+        result = aggregate_terms(filtered_df, zeta=zeta)
 
         expert_aggregations.append(result)
 
     # Convert list of dicts to DataFrame
     final_df = pd.DataFrame(expert_aggregations)
 
-    final_df.index = [f"Expert_{i+1}" for i in range(n_experts)]
+    final_df.index = [f"Expert_{i + 1}" for i in range(n_experts)]
 
     return final_df
 
 
-def get_criterion_aggregation(matrix, t_value=8, zeta_value=2, lower_scale=0.7, upper_scale=1.0):
+def get_criterion_aggregation(matrix, t_value=8, zeta=2, lower_scale=0.7, upper_scale=1.0):
     """
     Process a comparison matrix and calculate aggregated values for each criterion.
 
     Args:
         matrix (pandas.DataFrame or numpy.ndarray): The comparison matrix with values 0, 0.5, and 1
         t_value (int): Scale parameter for linguistic values, default 8
-        zeta_value (float): Operational parameter, default 2
+        zeta (float): Operational parameter, default 2
         lower_scale (float): Scale for lower approximation transformation, default 0.7
         upper_scale (float): Scale for upper approximation transformation, default 1.0
 
@@ -316,8 +146,8 @@ def get_criterion_aggregation(matrix, t_value=8, zeta_value=2, lower_scale=0.7, 
         # Calculate weights based on the matrix values (normalized row)
         weights = row_values / np.sum(row_values) if np.sum(row_values) > 0 else np.ones(n_criteria) / n_criteria
 
-        # Aggregate for this criterion
-        aggregated = aggregate_terms(data, weights=weights, t=t_value)
+        # Aggregate for this criterion - FIXED: Added zeta parameter
+        aggregated = aggregate_terms(data, weights=weights, zeta=zeta, t=t_value)
 
         # Store results
         for key in aggregated:
@@ -333,10 +163,26 @@ def get_criterion_aggregation(matrix, t_value=8, zeta_value=2, lower_scale=0.7, 
     return results_df
 
 
-def aggregate_expert_matrices(expert_matrices, weights_file="../results/expert_aggregation.csv", t_value=8):
+def aggregate_expert_matrices(expert_matrices, weights_df=None, zeta=2, t_value=8):
+    """
+    Aggregate multiple expert matrices using weights from a DataFrame or using equal weights.
 
-    expert_weights_df = pd.read_csv(weights_file)
-    weights = expert_weights_df['normalized'].values
+    Args:
+        expert_matrices: List of DataFrames containing expert evaluations
+        weights_df: DataFrame containing expert weights with a 'normalized' column,
+                   or None for equal weights (default: None)
+        zeta: Operational parameter for aggregation, default 2
+        t_value: Scale parameter for linguistic values, default 8
+
+    Returns:
+        pandas.DataFrame: Aggregated matrix
+    """
+    # Handle weights - either from DataFrame or create equal weights
+    if weights_df is not None:
+        weights = weights_df['normalized'].values
+    else:
+        # If no weights provided, use equal weights for all experts
+        weights = np.ones(len(expert_matrices)) / len(expert_matrices)
 
     if len(weights) != len(expert_matrices):
         raise ValueError(
@@ -391,7 +237,7 @@ def aggregate_expert_matrices(expert_matrices, weights_file="../results/expert_a
                 'nu_upper': valid_nu_upper
             })
 
-            aggregated_values = aggregate_terms(position_data, weights=valid_weights, t=t_value)
+            aggregated_values = aggregate_terms(position_data, weights=valid_weights, zeta=zeta, t=t_value)
 
             aggregated_matrix.at[row_idx, col] = (
                 aggregated_values['theta_lower'],

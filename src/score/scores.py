@@ -1,24 +1,20 @@
-﻿def get_score(row, t=8):
+﻿import numpy as np
+import pandas as pd
+
+
+def get_score(values, t=8):
     """
-    Compute the final score for a single row based on theta, mu, and nu values.
+    Compute the final score based on a tuple of theta, mu, and nu values.
 
     Args:
-        row (pandas.Series): A row from the DataFrame containing required columns.
+        values (tuple or list): (theta_lower, mu_lower, nu_lower, theta_upper, mu_upper, nu_upper)
         t (int, optional): Scale parameter. Defaults to 8.
 
     Returns:
         float: The calculated final score.
     """
+    theta_lower, mu_lower, nu_lower, theta_upper, mu_upper, nu_upper = values
 
-    # Directly use column names
-    theta_lower = row["theta_lower"]
-    mu_lower = row["mu_lower"]
-    nu_lower = row["nu_lower"]
-    theta_upper = row["theta_upper"]
-    mu_upper = row["mu_upper"]
-    nu_upper = row["nu_upper"]
-
-    # Calculate the final score
     inner_bracket = mu_lower + mu_upper - nu_lower - nu_upper
     nominator = 1 + (0.5 * inner_bracket)
     fraction = nominator / 2
@@ -27,24 +23,47 @@
     return final_score
 
 
+
+
 def add_final_scores(aggregated_df, t=8):
     """
-    Given an aggregated DataFrame (experts or criteria),
-    compute final score for each row and add it as a new column.
+    Compute final score for each row and add it as a new column.
 
     Args:
-        aggregated_df (pandas.DataFrame): DataFrame with theta_lower, mu_lower, nu_lower, etc.
+        aggregated_df (pandas.DataFrame): Must contain required columns.
         t (int, optional): Scale parameter. Defaults to 8.
 
     Returns:
-        pandas.DataFrame: Same as input but with an extra 'score' column.
+        pandas.DataFrame: Input DataFrame with added 'score' column.
     """
+    # Define the exact order of values to be passed as tuple
+    values = aggregated_df[[
+        "theta_lower", "mu_lower", "nu_lower",
+        "theta_upper", "mu_upper", "nu_upper"
+    ]].values
 
-    # Apply row-wise
-    scores = aggregated_df.apply(lambda row: get_score(row, t=t), axis=1)
+    scores = [get_score(row, t=t) for row in values]
 
-    # Add new column
     aggregated_df = aggregated_df.copy()
     aggregated_df["score"] = scores
 
     return aggregated_df
+
+
+
+def add_normalized_scores(df):
+    """
+    Add a normalized score column to the DataFrame.
+
+    Args:
+        df (pandas.DataFrame): DataFrame with 'score' column
+
+    Returns:
+        pandas.DataFrame: Same as input but with an extra 'normalized' column
+    """
+    score_sum = df['score'].sum()
+    if score_sum > 0:
+        df['normalized'] = df['score'] / score_sum
+    else:
+        df['normalized'] = 0
+    return df
